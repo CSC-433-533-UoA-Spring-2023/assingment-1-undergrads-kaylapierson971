@@ -5,21 +5,87 @@
   Email: amesmaieeli@email.arizona.edu
 */
 
-
 //access DOM elements we'll use
 var input = document.getElementById("load_image");
 var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d');
 
 // The width and height of the image
-var width = 0;
-var height = 0;
+var width = 600;
+var height = 600;
+
+
+// The canvas width and height
+canvas.width = width;
+canvas.height = height;
+
+var angle = 0;
 // The image data
 var ppm_img_data;
 
-//Function to process upload
+/*
+Function for the rotation matrix
+*/
+function getRotationMatrix(angle) {
+    return [
+        [Math.cos(angle), Math.sin(angle), 0],
+        [-Math.sin(angle), Math.cos(angle), 0],
+        [0, 0, 1]
+    ];
+}
+
+
+/*
+Function to rotate the image
+*/
+function rotation(){  
+	var newImageData = ctx.createImageData(width, height);
+	var rotationMatrix = getRotationMatrix(angle);
+		
+     var centerX = width / 2;
+     var centerY = height / 2;
+            
+     // Loop through all the pixels in the image and set its color
+     for (var i = 0; i < ppm_img_data.data.length; i += 4) {
+
+        // Get the pixel location in x and y with (0,0) being the top left of the image
+     	//var pixel = [Math.floor(i / 4) % width, 
+        //Math.floor(i / 4) / width, 1];
+        
+        var x = Math.floor(i / 4) % width;
+        var y = Math.floor(i / 4 / width);
+        
+        // Convert to relative coordinates
+        var relX = x - centerX;
+        var relY = y - centerY;
+        
+        // Get the location of the sample pixel
+        var samplePixel = MultiplyMatrixVector(rotationMatrix, [relX, relY, 1]);
+
+                // Floor pixel to integer
+        samplePixel[0] = Math.floor(samplePixel[0] + centerX);
+        samplePixel[1] = Math.floor(samplePixel[1] + centerY);
+        
+        // Make sure pixel is within the image boundaries
+        if (samplePixel[0] >= 0 && samplePixel[0] < width && samplePixel[1] >= 0 && samplePixel[1] < height){
+        	setPixelColor(newImageData, samplePixel, i);}
+     }
+     
+    ctx.putImageData(newImageData, canvas.width / 2 - width / 2, canvas.height / 2 - height / 2);
+
+    angle += 0.1;  
+    if (angle >= 360) {
+        angle = 0;
+    }
+    requestAnimationFrame(rotation);
+}
+
+/*
+Function to process upload
+*/
 var upload = function () {
     if (input.files.length > 0) {
+    
         var file = input.files[0];
         console.log("You chose", file.name);
         if (file.type) console.log("It has type", file.type);
@@ -30,49 +96,14 @@ var upload = function () {
             //if successful, file data has the contents of the uploaded file
             var file_data = fReader.result;
             parsePPM(file_data);
-
-            /*
-            * TODO: ADD CODE HERE TO DO 2D TRANSFORMATION and ANIMATION
-            * Modify any code if needed
-            * Hint: Write a rotation method, and call WebGL APIs to reuse the method for animation
-            */
-	    
-            // *** The code below is for the template to show you how to use matrices and update pixels on the canvas.
-            // *** Modify/remove the following code and implement animation
-
-	    // Create a new image data object to hold the new image
-            var newImageData = ctx.createImageData(width, height);
-	    var transMatrix = GetTranslationMatrix(0, height);// Translate image
-	    var scaleMatrix = GetScalingMatrix(1, -1);// Flip image y axis
-	    var matrix = MultiplyMatrixMatrix(transMatrix, scaleMatrix);// Mix the translation and scale matrices
-            
-            // Loop through all the pixels in the image and set its color
-            for (var i = 0; i < ppm_img_data.data.length; i += 4) {
-
-                // Get the pixel location in x and y with (0,0) being the top left of the image
-                var pixel = [Math.floor(i / 4) % width, 
-                             Math.floor(i / 4) / width, 1];
-        
-                // Get the location of the sample pixel
-                var samplePixel = MultiplyMatrixVector(matrix, pixel);
-
-                // Floor pixel to integer
-                samplePixel[0] = Math.floor(samplePixel[0]);
-                samplePixel[1] = Math.floor(samplePixel[1]);
-
-                setPixelColor(newImageData, samplePixel, i);
-            }
-
-            // Draw the new image
-            ctx.putImageData(newImageData, canvas.width/2 - width/2, canvas.height/2 - height/2);
-	    
-	    // Show matrix
-            showMatrix(matrix);
+            rotation();
         }
     }
 }
 
-// Show transformation matrix on HTML
+/*
+Function to show transformation matrix on HTML
+*/
 function showMatrix(matrix){
     for(let i=0;i<matrix.length;i++){
         for(let j=0;j<matrix[i].length;j++){
@@ -95,7 +126,10 @@ function setPixelColor(newImageData, samplePixel, i){
     newImageData.data[i + 3] = 255;
 }
 
-// Load PPM Image to Canvas
+
+/*
+Load PPM Image to Canvas
+*/
 // Untouched from the original code
 function parsePPM(file_data){
     /*
@@ -139,6 +173,8 @@ function parsePPM(file_data){
     // update width and height of canvas
     document.getElementById("canvas").setAttribute("width", window.innerWidth);
     document.getElementById("canvas").setAttribute("height", window.innerHeight);
+
+
     // create ImageData object
     var image_data = ctx.createImageData(width, height);
     // fill ImageData
